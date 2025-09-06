@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +31,7 @@ const formSchema = z.object({
 
 export function RegisterForm() {
   const router = useRouter();
+  const { register } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -45,14 +47,15 @@ export function RegisterForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     
-    // TODO: Implement actual registration logic
-    console.log(values);
-    
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      await register(values.email, values.password, values.name);
+      // Navigation is handled in the register function
+    } catch (error) {
+      console.error('Registration failed:', error);
+      // Handle registration error
+    } finally {
       setIsLoading(false);
-      router.push('/auth/login');
-    }, 1000);
+    }
   }
 
   return (

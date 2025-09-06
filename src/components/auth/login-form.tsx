@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +22,7 @@ const formSchema = z.object({
 
 export function LoginForm() {
   const router = useRouter();
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -34,14 +36,15 @@ export function LoginForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     
-    // TODO: Implement actual authentication logic
-    console.log(values);
-    
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      await login(values.email, values.password);
+      // Navigation is handled in the login function
+    } catch (error) {
+      console.error('Login failed:', error);
+      // Handle login error
+    } finally {
       setIsLoading(false);
-      router.push('/polls');
-    }, 1000);
+    }
   }
 
   return (
