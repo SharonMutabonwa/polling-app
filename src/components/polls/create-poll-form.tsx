@@ -1,68 +1,74 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, useFieldArray } from 'react-hook-form';
-import * as z from 'zod';
-
-const formSchema = z.object({
-  title: z.string().min(5, {
-    message: 'Title must be at least 5 characters.',
-  }).max(100, {
-    message: 'Title must not exceed 100 characters.',
-  }),
-  description: z.string().max(500, {
-    message: 'Description must not exceed 500 characters.',
-  }).optional(),
-  options: z.array(
-    z.object({
-      text: z.string().min(1, { message: 'Option text is required.' }),
-    })
-  ).min(2, {
-    message: 'At least 2 options are required.',
-  }).max(10, {
-    message: 'Maximum 10 options allowed.',
-  }),
-});
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { createPoll } from '@/lib/actions/polls';
+import { useAuth } from '@/context/AuthContext';
+import { Plus, X } from 'lucide-react';
 
 export function CreatePollForm() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [question, setQuestion] = useState('');
+  const [options, setOptions] = useState(['', '']);
+  const [error, setError] = useState('');
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      title: '',
-      description: '',
-      options: [
-        { text: '' },
-        { text: '' },
-      ],
-    },
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'options',
-  });
-
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsLoading(true);
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     
-    // TODO: Implement actual poll creation logic
-    console.log(values);
-    
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      router.push('/polls');
-    }, 1000);
-  }
+    if (!user) {
+      setError('You must be logged in to create a poll');
+      return;
+    }
+
+    // Basic validation
+    if (question.trim().length < 5) {
+      setError('Question must be at least 5 characters');
+      return;
+    }
+
+    const validOptions = options.filter(option => option.trim() !== '');
+    if (validOptions.length < 2) {
+      setError('At least 2 options are required');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('question', question.trim());
+      validOptions.forEach(option => {
+        formData.append('options', option.trim());
+      });
+
+      await createPoll(formData);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to create poll');
+      setIsSubmitting(false);
+    }
+  };
+
+  const addOption = () => {
+    if (options.length < 10) {
+      setOptions([...options, '']);
+    }
+  };
+
+  const removeOption = (index: number) => {
+    if (options.length > 2) {
+      setOptions(options.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateOption = (index: number, value: string) => {
+    const newOptions = [...options];
+    newOptions[index] = value;
+    setOptions(newOptions);
+  };
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
@@ -73,89 +79,74 @@ export function CreatePollForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Poll Title</FormLabel>
-                  <FormControl>
-                    <Input placeholder="What is your favorite...?" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label htmlFor="question" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+              Poll Question
+            </label>
+            <Input
+              id="question"
+              placeholder="What is your favorite...?"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              maxLength={100}
+              required
             />
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Provide more context about your poll" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <FormLabel>Poll Options</FormLabel>
-                {fields.length < 10 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => append({ text: '' })}
-                  >
-                    Add Option
-                  </Button>
-                )}
-              </div>
-              
-              {fields.map((field, index) => (
-                <div key={field.id} className="flex items-center gap-2">
-                  <FormField
-                    control={form.control}
-                    name={`options.${index}.text`}
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormControl>
-                          <Input placeholder={`Option ${index + 1}`} {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  {fields.length > 2 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => remove(index)}
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
-              ))}
-              {form.formState.errors.options?.message && (
-                <p className="text-sm font-medium text-destructive">
-                  {form.formState.errors.options?.message}
-                </p>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Poll Options
+              </label>
+              {options.length < 10 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addOption}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Option
+                </Button>
               )}
             </div>
             
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Creating Poll...' : 'Create Poll'}
-            </Button>
-          </form>
-        </Form>
+            {options.map((option, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input
+                  placeholder={`Option ${index + 1}`}
+                  value={option}
+                  onChange={(e) => updateOption(index, e.target.value)}
+                  className="flex-1"
+                />
+                {options.length > 2 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeOption(index)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {error && (
+            <p className="text-sm font-medium text-destructive">
+              {error}
+            </p>
+          )}
+          
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? 'Creating Poll...' : 'Create Poll'}
+          </Button>
+        </form>
       </CardContent>
     </Card>
   );
 }
+
+export default CreatePollForm;

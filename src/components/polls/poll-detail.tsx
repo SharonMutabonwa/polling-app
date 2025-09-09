@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { submitVote } from '@/lib/actions/votes';
 
 type PollOption = {
   id: string;
@@ -42,10 +43,14 @@ export function PollDetail({
     
     setIsVoting(true);
     
-    // TODO: Implement actual voting logic with API call
-    // Simulate API call
-    setTimeout(() => {
-      // Update the poll options with the new vote
+    try {
+      const formData = new FormData();
+      formData.append('pollId', id);
+      formData.append('optionId', selectedOption);
+      
+      await submitVote(formData);
+      
+      // Update local state to reflect the vote
       const updatedOptions = pollOptions.map(option => {
         if (option.id === selectedOption) {
           return { ...option, votes: option.votes + 1 };
@@ -56,8 +61,12 @@ export function PollDetail({
       setPollOptions(updatedOptions);
       setPollTotalVotes(prev => prev + 1);
       setUserHasVoted(true);
+    } catch (error) {
+      console.error('Failed to submit vote:', error);
+      // You could add error state here if needed
+    } finally {
       setIsVoting(false);
-    }, 1000);
+    }
   };
 
   return (
